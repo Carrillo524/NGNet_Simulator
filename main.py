@@ -1,7 +1,7 @@
 import os
-from Lógica.NetworkBuilder import generar_red_computadores
-from Lógica.AutomataNetwork import AutomataComunicacion
-from Lógica.GnnInference import EvaluadorRedGNN
+from Logica.NetworkBuilder import generar_red_computadores
+from Logica.AutomataNetwork import AutomataComunicacion
+from Logica.GnnInference import EvaluadorRedGNN
 
 def ejecutar_simulacion():
     print("=" * 50)
@@ -19,7 +19,7 @@ def ejecutar_simulacion():
     
     # Si el modelo está dentro de Lógica, ajusta a: os.path.join(os.path.dirname(__file__), 'Lógica', 'modelo_gat.pth')
     if not os.path.exists(ruta_modelo):
-        ruta_modelo = os.path.join(os.path.dirname(__file__), 'Lógica', 'modelo_gat.pth')
+        ruta_modelo = os.path.join(os.path.dirname(__file__), 'Logica', 'modelo_gat.pth')
 
     evaluador = EvaluadorRedGNN(ruta_modelo)
     predicciones = evaluador.predecir_anomalias(red)
@@ -50,7 +50,7 @@ def ejecutar_simulacion():
     ]
 
     for cad, desc in secuencias_prueba:
-        valida, estado_fin = automata.procesar_cadena(cad)
+        valida, estado_fin, _ = automata.procesar_cadena(cad)
         if 'E' in cad:
             resultado_str = "Finalizada con ERROR (Recuperado)"
         elif valida:

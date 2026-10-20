@@ -7,9 +7,9 @@ import networkx as nx
 import json
 import random
 
-from Lógica.NetworkBuilder import generar_red_computadores
-from Lógica.AutomataNetwork import AutomataComunicacion
-from Lógica.GnnInference import EvaluadorRedGNN
+from Logica.NetworkBuilder import generar_red_computadores
+from Logica.AutomataNetwork import AutomataComunicacion
+from Logica.GnnInference import EvaluadorRedGNN
 
 st.set_page_config(page_title="NGNet Live Simulator", layout="wide")
 
@@ -40,7 +40,7 @@ if 'anim_id' not in st.session_state:
 # Cargar GNN
 ruta_modelo = os.path.join(os.path.dirname(__file__), 'modelo_gat.pth')
 if not os.path.exists(ruta_modelo):
-    ruta_modelo = os.path.join(os.path.dirname(__file__), 'Lógica', 'modelo_gat.pth')
+    ruta_modelo = os.path.join(os.path.dirname(__file__), 'Logica', 'modelo_gat.pth')
 
 evaluador = EvaluadorRedGNN(ruta_modelo)
 
