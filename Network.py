@@ -83,16 +83,50 @@ if st.button("🔄 Regenerar Red Aleatoria", use_container_width=True):
 st.sidebar.divider()
 
 st.sidebar.subheader("🎛️ Ajuste Dinámico de Nodo")
-nodo_sel = st.sidebar.selectbox("Seleccionar Nodo:", list(st.session_state.red.nodes()))
 
-if nodo_sel is not None:
-    attr_sel = st.session_state.red.nodes[nodo_sel]
-    st.sidebar.caption(f"Tipo: **{attr_sel['tipo']}**")
-    nuevo_trafico = st.sidebar.slider("Tráfico:", 0.0, 1.0, float(attr_sel['trafico']), 0.05, key=f"traf_{nodo_sel}")
-    nueva_cpu = st.sidebar.slider("CPU:", 0.0, 1.0, float(attr_sel['cpu']), 0.05, key=f"cpu_{nodo_sel}")
-    st.session_state.red.nodes[nodo_sel]['trafico'] = nuevo_trafico
-    st.session_state.red.nodes[nodo_sel]['cpu'] = nueva_cpu
+nodos_disponibles = sorted(list(st.session_state.red.nodes()))
+nodo_sel = st.sidebar.selectbox("Seleccionar Nodo:", nodos_disponibles)
 
+attr_sel = st.session_state.red.nodes[nodo_sel]
+
+# 1. Normalización y protección de rango [0.0, 1.0]
+raw_trafico = float(attr_sel.get('trafico', 0.50))
+raw_cpu = float(attr_sel.get('cpu', 0.50))
+
+if raw_trafico > 1.0:
+    raw_trafico /= 100.0
+if raw_cpu > 1.0:
+    raw_cpu /= 100.0
+
+val_trafico_actual = round(min(1.0, max(0.0, raw_trafico)), 2)
+val_cpu_actual = round(min(1.0, max(0.0, raw_cpu)), 2)
+
+st.sidebar.write(f"**Tipo:** {attr_sel.get('tipo', 'Desconocido')}")
+
+# 2. Clave dinámica vinculada al nodo y al anim_id
+anim_key = st.session_state.get('anim_id', 0)
+
+nuevo_trafico = st.sidebar.slider(
+    "Tráfico:",
+    min_value=0.0,
+    max_value=1.0,
+    value=val_trafico_actual,
+    step=0.01,
+    key=f"slider_trafico_{nodo_sel}_{anim_key}"
+)
+
+nuevo_cpu = st.sidebar.slider(
+    "CPU:",
+    min_value=0.0,
+    max_value=1.0,
+    value=val_cpu_actual,
+    step=0.01,
+    key=f"slider_cpu_{nodo_sel}_{anim_key}"
+)
+
+# 3. Guardado reactivo en el grafo
+st.session_state.red.nodes[nodo_sel]['trafico'] = round(nuevo_trafico, 2)
+st.session_state.red.nodes[nodo_sel]['cpu'] = round(nuevo_cpu, 2)
 st.sidebar.divider()
 
 st.sidebar.subheader("🔒 Aislamiento & Bloqueo")
