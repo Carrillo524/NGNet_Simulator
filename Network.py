@@ -165,7 +165,8 @@ with tab_red:
     ruta_renderizada = []
     exito_transmision = False
     mensaje_sim = ""
-    tipo_colision = "ninguna"
+    obstaculo_tipo = "ninguno"
+    nodo_destino_enlace = None
 
     with col_right:
         st.subheader("📡 Inyección y Simulación de Tráfico")
@@ -181,58 +182,53 @@ with tab_red:
         if st.button("🚀 Transmitir Paquete", use_container_width=True):
             st.session_state.anim_id += 1
             
-            cadena_predeterminada = "PWSR"
-            automata_net = AutomataComunicacion()
-            res_aut = automata_net.procesar_cadena(cadena_predeterminada)
-            valido = res_aut[0] if isinstance(res_aut, tuple) else res_aut
+            # 1. EVALUAR ESTADO DEL ORIGEN Y DESTINO
+            origen_bloqueado = origen in st.session_state.nodos_bloqueados
+            origen_anomalo = (predicciones[origen] == "Anómalo")
+            destino_bloqueado = destino in st.session_state.nodos_bloqueados
+            destino_anomalo = (predicciones[destino] == "Anómalo")
 
-            UMBRAL_SATURACION = 1.00  # 100% de uso de ancho de banda
-            
-            # 1. GRAFO DE RUTA 100% LIMPIA (Solo nodos normales NO bloqueados y enlaces no saturados)
+            # 2. CONSTRUIR SUBGRAFO LIMPIO (Umbral estricto < 1.00)
             G_limpio = nx.Graph()
             for u, attr in st.session_state.red.nodes(data=True):
-                es_anomalo = (predicciones[u] == "Anómalo")
-                esta_bloqueado = (u in st.session_state.nodos_bloqueados)
-                if not es_anomalo and not esta_bloqueado:
+                es_malo = (predicciones[u] == "Anómalo") or (u in st.session_state.nodos_bloqueados)
+                if not es_malo:
                     G_limpio.add_node(u, **attr)
-
-            if origen not in G_limpio: G_limpio.add_node(origen, **st.session_state.red.nodes[origen])
-            if destino not in G_limpio: G_limpio.add_node(destino, **st.session_state.red.nodes[destino])
 
             for u, v, attr in st.session_state.red.edges(data=True):
                 if u in G_limpio and v in G_limpio:
                     conexion_cortada = (u, v) in st.session_state.conexiones_bloqueadas or (v, u) in st.session_state.conexiones_bloqueadas
                     carga_enlace = calcular_carga_acumulada_arista(st.session_state.red, u, v)
-                    
-                    if not conexion_cortada and carga_enlace < UMBRAL_SATURACION:
-                        es_u_intermedio_malo = (u != origen and u != destino) and (predicciones[u] == "Anómalo" or u in st.session_state.nodos_bloqueados)
-                        es_v_intermedio_malo = (v != origen and v != destino) and (predicciones[v] == "Anómalo" or v in st.session_state.nodos_bloqueados)
-                        
-                        if not es_u_intermedio_malo and not es_v_intermedio_malo:
-                            latencia_base = attr['peso']
-                            
-                            # --- PENALIZACIÓN EXPONENCIAL PARA DIJKSTRA ---
-                            penalizacion_congestion = 1.0 + 8.0 * (carga_enlace ** 3)
-                            peso_efectivo = latencia_base * penalizacion_congestion
-                            
-                            G_limpio.add_edge(u, v, weight=peso_efectivo)
+                    if not conexion_cortada and carga_enlace < 1.00:
+                        G_limpio.add_edge(u, v, weight=attr['peso'] * (1.0 + carga_enlace))
 
-            # 2. EVALUACIÓN DE ALCANCE
-            hay_ruta_exitosa = nx.has_path(G_limpio, origen, destino) and valido
+            # 3. VERIFICAR SI EXISTE CAMINO LIMPIO
+            hay_ruta_exitosa = (
+                not origen_bloqueado and not origen_anomalo and
+                not destino_bloqueado and not destino_anomalo and
+                origen in G_limpio and destino in G_limpio and
+                nx.has_path(G_limpio, origen, destino)
+            )
+
+            obstaculo_tipo = "ninguno"
+            nodo_destino_enlace = None
 
             if hay_ruta_exitosa:
                 ruta_renderizada = nx.shortest_path(G_limpio, origen, destino, weight='weight')
                 exito_transmision = True
                 mensaje_sim = f"✅ Transmisión Exitosa (ACK) vía {' -> '.join(map(str, ruta_renderizada))}"
             else:
-                # 3. SI HAY OBSTRUCCIÓN: Calcular ruta física disponible hasta el punto exacto de colisión
                 exito_transmision = False
-                tipo_colision = "ninguna"
-                
-                if nx.has_path(st.session_state.red, origen, destino):
+
+                if origen_bloqueado or origen_anomalo:
+                    causa_obstaculo = "Nodo de Origen Bloqueado 🔒" if origen_bloqueado else "Nodo de Origen Anómalo 🔴"
+                    ruta_renderizada = [origen]
+                    obstaculo_tipo = "origen"
+                    mensaje_sim = f"⚠️ Transmisión Abortada: {causa_obstaculo} N{origen}. No puede emitir paquetes."
+                elif nx.has_path(st.session_state.red, origen, destino):
                     ruta_topologica = nx.shortest_path(st.session_state.red, origen, destino)
                     ruta_alcanzada = [origen]
-                    causa_obstaculo = "Desconocida"
+                    causa_obstaculo = "Falla de red"
 
                     for idx in range(1, len(ruta_topologica)):
                         nodo_prev = ruta_topologica[idx - 1]
@@ -241,26 +237,31 @@ with tab_red:
                         conexion_cortada = (nodo_prev, nodo_act) in st.session_state.conexiones_bloqueadas or (nodo_act, nodo_prev) in st.session_state.conexiones_bloqueadas
                         carga_enlace = calcular_carga_acumulada_arista(st.session_state.red, nodo_prev, nodo_act)
                         es_bloqueado = nodo_act in st.session_state.nodos_bloqueados
-                        es_anomalo = predicciones[nodo_act] == "Anómalo"
+                        es_anomalo = (predicciones[nodo_act] == "Anómalo")
 
+                        # PRIORIDAD 1: EL CANAL FÍSICO (El paquete no puede pasar si el enlace falla)
+                        if conexion_cortada:
+                            causa_obstaculo = f"Enlace Cortado ✂️ entre N{nodo_prev} y N{nodo_act}"
+                            obstaculo_tipo = "enlace"
+                            nodo_destino_enlace = nodo_act
+                            break
+                        elif carga_enlace >= 1.00:
+                            causa_obstaculo = f"Enlace Saturado ⚠️ ({int(carga_enlace*100)}%) entre N{nodo_prev} y N{nodo_act}"
+                            obstaculo_tipo = "enlace"
+                            nodo_destino_enlace = nodo_act
+                            break
+
+                        # PRIORIDAD 2: SI EL ENLACE ESTÁ SANO, EL PAQUETE ALCANZA EL NODO
                         ruta_alcanzada.append(nodo_act)
 
-                        # Choque en Arista
-                        if conexion_cortada or carga_enlace >= UMBRAL_SATURACION:
-                            tipo_colision = "arista"
-                            if conexion_cortada:
-                                causa_obstaculo = f"Enlace Cortado ✂️ entre N{nodo_prev} y N{nodo_act}"
-                            else:
-                                causa_obstaculo = f"Enlace Saturado ⚠️ ({int(carga_enlace*100)}%) entre N{nodo_prev} y N{nodo_act}"
+                        # PRIORIDAD 3: EVALUAR EL NODO ALCANZADO
+                        if es_bloqueado:
+                            causa_obstaculo = f"Nodo Bloqueado 🔒 N{nodo_act}"
+                            obstaculo_tipo = "nodo"
                             break
-                        
-                        # Choque en Nodo
-                        if es_bloqueado or es_anomalo:
-                            tipo_colision = "nodo"
-                            if es_bloqueado:
-                                causa_obstaculo = f"Nodo Bloqueado 🔒 N{nodo_act}"
-                            else:
-                                causa_obstaculo = f"Nodo Anómalo 🔴 N{nodo_act}"
+                        elif es_anomalo:
+                            causa_obstaculo = f"Nodo Anómalo 🔴 N{nodo_act}"
+                            obstaculo_tipo = "nodo"
                             break
 
                     ruta_renderizada = ruta_alcanzada
@@ -287,54 +288,67 @@ with tab_red:
         st.subheader("🕸️ Topología Interactiva de Red")
         
         net = Network(height="530px", width="100%", bgcolor="#111827", font_color="white", directed=False)
-        net.force_atlas_2based()
+        net.toggle_physics(False)
+        net.set_options("""
+        {
+          "interaction": {
+            "dragNodes": true,
+            "dragView": true,
+            "zoomView": true,
+            "hover": true
+          }
+        }
+        """)
 
-        # Renderizado de nodos
         for nodo in st.session_state.red.nodes():
             attr = st.session_state.red.nodes[nodo]
             estado_gnn = predicciones[nodo]
             esta_bloqueado = nodo in st.session_state.nodos_bloqueados
             
-            if esta_bloqueado:
-                color = "#6B7280"
-            elif estado_gnn == "Anómalo":
-                color = "#EF4444"
-            else:
-                color = "#10B981"
+            color = "#6B7280" if esta_bloqueado else ("#EF4444" if estado_gnn == "Anómalo" else "#10B981")
 
-            net.add_node(nodo, label=f"N{nodo} ({attr['tipo']})", color=color, size=22)
+            net.add_node(
+                nodo, 
+                label=f"N{nodo} ({attr['tipo']})", 
+                color=color, 
+                size=22,
+                x=attr.get('x'),
+                y=attr.get('y'),
+                physics=False
+            )
 
-        # Renderizado de aristas con Tooltips nativos
         for source, target, attr_e in st.session_state.red.edges(data=True):
             conexion_cortada = (source, target) in st.session_state.conexiones_bloqueadas or (target, source) in st.session_state.conexiones_bloqueadas
             
             if not conexion_cortada:
                 carga_acumulada = calcular_carga_acumulada_arista(st.session_state.red, source, target)
                 peso_val = attr_e.get('peso', 1.0)
-                capacidad_val = attr_e.get('capacidad', 1000)
-                
-                tipo_enlace = "FastEthernet" if capacidad_val == 100 else "GigabitEthernet"
+                capacidad_val = attr_e.get('capacidad', 100)
                 color_edge = "#EF4444" if carga_acumulada >= 1.00 else ("#F59E0B" if carga_acumulada >= 0.75 else "#4B5563")
 
-                # Tooltip de Hover (texto plano con saltos)
-                tooltip_text = (
-                    f"Conexión N{source} ↔ N{target}\n"
-                    f"• Capacidad: {capacidad_val} Mbps ({tipo_enlace})\n"
-                    f"• Latencia Base: {peso_val:.1f} ms\n"
-                    f"• Carga Acumulada: {int(carga_acumulada * 100)}%"
+                # Texto plano limpio con saltos de línea nativos
+                info_tooltip = (
+                    f"Enlace N{source} ⟷ N{target}\n"
+                    f"• Capacidad: {capacidad_val} Mbps\n"
+                    f"• Latencia base: {peso_val:.1f} ms\n"
+                    f"• Carga acumulada: {carga_acumulada:.2f} ({int(carga_acumulada*100)}%)"
                 )
-
-                label_text = f"{peso_val:.1f}ms"
-                ancho_linea = 3 if capacidad_val == 1000 else 1.5
 
                 net.add_edge(
                     source, 
                     target, 
-                    value=peso_val, 
-                    label=label_text,
-                    title=tooltip_text,
-                    width=ancho_linea, 
-                    color=color_edge
+                    # Se elimina 'value=peso_val' para evitar que Vis.js agrande la fuente
+                    label=f"{peso_val:.1f}ms", 
+                    title=info_tooltip,
+                    width=2, 
+                    color=color_edge,
+                    font={
+                        'size': 10, 
+                        'color': '#E5E7EB', 
+                        'background': '#111827', 
+                        'strokeWidth': 0,
+                        'align': 'horizontal'
+                    }
                 )
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmpfile:
@@ -344,102 +358,172 @@ with tab_red:
 
         js_animacion = f"""
         <!-- ID de Animación Dinámico: {st.session_state.anim_id} -->
+        <style>
+            div.vis-tooltip {{
+                position: absolute;
+                background-color: #1f2937 !important;
+                color: #f9fafb !important;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+                font-size: 12px !important;
+                line-height: 1.5 !important;
+                padding: 8px 12px !important;
+                border: 1px solid #374151 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.6) !important;
+                white-space: pre-line !important;
+                z-index: 99999 !important;
+                pointer-events: none !important;
+            }}
+        </style>
         <script>
         (function() {{
-            function iniciarAnimacionColisionRebote() {{
-                if (typeof network === 'undefined' || !network) {{
-                    setTimeout(iniciarAnimacionColisionRebote, 150);
+            var initialPositions = {{}};
+
+            function configurarRetornoYAnimacion() {{
+                if (typeof network === 'undefined' || !network || typeof nodes === 'undefined' || !nodes) {{
+                    setTimeout(configurarRetornoYAnimacion, 150);
                     return;
                 }}
 
+                var canvasPositions = network.getPositions();
+                for (var id in canvasPositions) {{
+                    initialPositions[id] = {{ x: canvasPositions[id].x, y: canvasPositions[id].y }};
+                }}
+
+                network.on("dragEnd", function(params) {{
+                    if (params.nodes && params.nodes.length > 0) {{
+                        var draggedId = params.nodes[0];
+                        var target = initialPositions[draggedId];
+                        if (target) {{
+                            var current = network.getPositions([draggedId])[draggedId];
+                            if (current) {{
+                                var step = 0;
+                                var maxSteps = 12;
+                                var startX = current.x;
+                                var startY = current.y;
+                                var timer = setInterval(function() {{
+                                    step++;
+                                    var p = step / maxSteps;
+                                    nodes.update({{
+                                        id: draggedId,
+                                        x: startX + (target.x - startX) * p,
+                                        y: startY + (target.y - startY) * p
+                                    }});
+                                    network.redraw();
+
+                                    if (step >= maxSteps) {{
+                                        clearInterval(timer);
+                                        nodes.update({{ id: draggedId, x: target.x, y: target.y }});
+                                        network.redraw();
+                                    }}
+                                }}, 16);
+                            }}
+                        }}
+                    }}
+                }});
+
                 var rutaCorta = {json.dumps(ruta_renderizada)};
                 var esExito = {json.dumps(exito_transmision)};
-                var tipoColision = "{tipo_colision}";
+                var obstaculoTipo = {json.dumps(obstaculo_tipo)};
+                var nodoDestinoEnlace = {json.dumps(nodo_destino_enlace)};
 
-                if (!rutaCorta || rutaCorta.length < 2) return;
+                if (!rutaCorta || (rutaCorta.length < 2 && obstaculoTipo !== "enlace")) return;
 
-                var animSteps = [];
-                
-                // 1. Planificar Fase de IDA (Envío)
-                for (let i = 0; i < rutaCorta.length - 1; i++) {{
-                    let isLastIda = (i === rutaCorta.length - 2);
-                    // Si falla por arista saturada, el último avance topa al 50% de la línea
-                    let limit = (isLastIda && !esExito && tipoColision === 'arista') ? 0.5 : 1.0;
-                    animSteps.push({{ src: rutaCorta[i], dst: rutaCorta[i+1], startP: 0.0, limit: limit, esRegreso: false }});
+                var steps = [];
+
+                if (esExito === true) {{
+                    for (var i = 0; i < rutaCorta.length - 1; i++) {{
+                        steps.push({{ from: rutaCorta[i], to: rutaCorta[i+1], startP: 0.0, endP: 1.0, color: '#00F0FF' }});
+                    }}
+                    for (var i = rutaCorta.length - 1; i > 0; i--) {{
+                        steps.push({{ from: rutaCorta[i], to: rutaCorta[i-1], startP: 0.0, endP: 1.0, color: '#32FA99' }});
+                    }}
+                }} else if (obstaculoTipo === "nodo") {{
+                    for (var i = 0; i < rutaCorta.length - 1; i++) {{
+                        steps.push({{ from: rutaCorta[i], to: rutaCorta[i+1], startP: 0.0, endP: 1.0, color: '#00F0FF' }});
+                    }}
+                    for (var i = rutaCorta.length - 1; i > 0; i--) {{
+                        steps.push({{ from: rutaCorta[i], to: rutaCorta[i-1], startP: 0.0, endP: 1.0, color: '#FF0055' }});
+                    }}
+                }} else if (obstaculoTipo === "enlace" && nodoDestinoEnlace !== null) {{
+                    var prevNode = rutaCorta[rutaCorta.length - 1];
+                    for (var i = 0; i < rutaCorta.length - 1; i++) {{
+                        steps.push({{ from: rutaCorta[i], to: rutaCorta[i+1], startP: 0.0, endP: 1.0, color: '#00F0FF' }});
+                    }}
+                    steps.push({{ from: prevNode, to: nodoDestinoEnlace, startP: 0.0, endP: 0.22, color: '#00F0FF' }});
+                    steps.push({{ from: prevNode, to: nodoDestinoEnlace, startP: 0.22, endP: 0.0, color: '#FF0055' }});
+                    for (var i = rutaCorta.length - 1; i > 0; i--) {{
+                        steps.push({{ from: rutaCorta[i], to: rutaCorta[i-1], startP: 0.0, endP: 1.0, color: '#FF0055' }});
+                    }}
                 }}
 
-                // 2. Planificar Fase de REGRESO (Rebote)
-                if (!esExito) {{
-                    for (let i = rutaCorta.length - 1; i > 0; i--) {{
-                        let isFirstRegreso = (i === rutaCorta.length - 1);
-                        // Si chocó en la arista, el regreso empieza desde ese 50% hacia atrás
-                        let startP = (isFirstRegreso && tipoColision === 'arista') ? 0.5 : 0.0;
-                        animSteps.push({{ src: rutaCorta[i], dst: rutaCorta[i-1], startP: startP, limit: 1.0, esRegreso: true }});
-                    }}
-                }} else {{
-                    for (let i = rutaCorta.length - 1; i > 0; i--) {{
-                        animSteps.push({{ src: rutaCorta[i], dst: rutaCorta[i-1], startP: 0.0, limit: 1.0, esRegreso: true }});
-                    }}
-                }}
+                if (steps.length === 0) return;
 
-                var currentStepIdx = 0;
-                var progress = animSteps.length > 0 ? animSteps[0].startP : 0.0;
-                var speed = 0.015;
-
-                network.setOptions({{ physics: {{ enabled: false }} }});
+                var currentStepIndex = 0;
+                var t = 0.0;
+                var animacionFinalizada = false;
+                var lastTimestamp = performance.now();
+                var animFramePending = false;
 
                 network.on("afterDrawing", function(ctx) {{
-                    if (currentStepIdx < animSteps.length) {{
-                        var step = animSteps[currentStepIdx];
-                        var posA = network.getPositions([step.src])[step.src];
-                        var posB = network.getPositions([step.dst])[step.dst];
+                    if (currentStepIndex < steps.length) {{
+                        var now = performance.now();
+                        var dt = (now - lastTimestamp) / 1000;
+                        lastTimestamp = now;
+
+                        if (dt > 0.05) dt = 0.05;
+
+                        var step = steps[currentStepIndex];
+                        var posA = network.getPositions([step.from])[step.from];
+                        var posB = network.getPositions([step.to])[step.to];
 
                         if (posA && posB) {{
-                            var posX = posA.x + (posB.x - posA.x) * progress;
-                            var posY = posA.y + (posB.y - posA.y) * progress;
+                            var p = step.startP + (step.endP - step.startP) * t;
+                            var posX = posA.x + (posB.x - posA.x) * p;
+                            var posY = posA.y + (posB.y - posA.y) * p;
 
                             ctx.save();
                             ctx.beginPath();
-                            ctx.arc(posX, posY, 10, 0, 2 * Math.PI, false);
-                            
-                            var colorNeon;
-                            if (esExito === true) {{
-                                colorNeon = step.esRegreso ? '#32FA99' : '#00F0FF';
-                            }} else {{
-                                colorNeon = step.esRegreso ? '#FF0055' : '#00F0FF';
-                            }}
-                            
-                            ctx.fillStyle = colorNeon;
-                            ctx.shadowColor = colorNeon;
-                            ctx.shadowBlur = 20;
+                            ctx.arc(posX, posY, 9, 0, 2 * Math.PI, false);
+                            ctx.fillStyle = step.color;
+                            ctx.shadowColor = step.color;
+                            ctx.shadowBlur = 18;
                             ctx.fill();
                             ctx.strokeStyle = '#FFFFFF';
                             ctx.lineWidth = 2;
                             ctx.stroke();
                             ctx.restore();
 
-                            progress += speed;
-                            if (progress >= step.limit) {{
-                                currentStepIdx++;
-                                if (currentStepIdx < animSteps.length) {{
-                                    progress = animSteps[currentStepIdx].startP;
-                                }}
+                            var dist = Math.abs(step.endP - step.startP);
+                            var duration = dist < 0.5 ? 0.45 : 1.10;
+                            t += dt / duration;
+
+                            if (t >= 1.0) {{
+                                t = 0.0;
+                                currentStepIndex++;
                             }}
 
-                            requestAnimationFrame(function() {{
-                                network.redraw();
-                            }});
+                            if (!animFramePending && currentStepIndex < steps.length) {{
+                                animFramePending = true;
+                                requestAnimationFrame(function() {{
+                                    animFramePending = false;
+                                    network.redraw();
+                                }});
+                            }}
                         }}
+                    }} else if (!animacionFinalizada) {{
+                        animacionFinalizada = true;
+                        network.setOptions({{ physics: {{ enabled: true }} }});
+                        network.redraw();
                     }}
                 }});
 
                 network.redraw();
             }}
 
-            setTimeout(iniciarAnimacionColisionRebote, 400);
+            setTimeout(configurarRetornoYAnimacion, 400);
         }})();
         </script>
-        </body>
         """
         
         html_animado = html_content.replace("</body>", js_animacion)
@@ -642,5 +726,7 @@ with tab_automata:
         </body>
         </html>
         """
+
+        components.html(html_automata_reactivo, height=520)
 
         components.html(html_automata_reactivo, height=520)

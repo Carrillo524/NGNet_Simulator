@@ -1,1 +1,17 @@
-/.vscode
+# Bytecode y cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configuración local de VS Code
+.vscode/
+
+# Entornos virtuales y librerías externas
+lib/
+venv/
+.env/
+env/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
