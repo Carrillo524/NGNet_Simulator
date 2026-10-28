@@ -67,13 +67,18 @@ def calcular_carga_acumulada_arista(G, u, v):
 # --- PANEL LATERAL ---
 st.sidebar.header("🕹️ Controles de Red")
 
-if st.sidebar.button("🔄 Regenerar Red Aleatoria"):
-    st.session_state.red = generar_red_computadores(num_nodos=12, prob_conexion=0.25)
-    nodos_lista = list(st.session_state.red.nodes())
-    st.session_state.nodos_bloqueados = set(random.sample(nodos_lista, k=min(2, len(nodos_lista))))
-    st.session_state.conexiones_bloqueadas = set()
-    st.session_state.anim_id += 1
-    st.rerun()
+if st.button("🔄 Regenerar Red Aleatoria", use_container_width=True):
+        st.session_state.red = generar_red_computadores()
+        st.session_state.nodos_bloqueados = set(random.sample(list(st.session_state.red.nodes()), 2))
+        st.session_state.conexiones_bloqueadas = set()
+        st.session_state.anim_id += 1
+        
+        # Elimina las claves cacheadas de los sliders para que lean los nuevos valores aleatorios
+        for k in list(st.session_state.keys()):
+            if "trafico" in k or "cpu" in k or "slider" in k:
+                del st.session_state[k]
+                
+        st.rerun()
 
 st.sidebar.divider()
 
