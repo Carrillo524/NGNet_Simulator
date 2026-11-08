@@ -276,7 +276,7 @@ if lista_aristas:
         u_int, v_int = int(u_str), int(v_str)
         
         es_cortada = (u_int, v_int) in st.session_state.conexiones_bloqueadas or (v_int, u_int) in st.session_state.conexiones_bloqueadas
-        btn_arista_label = "🔌 Reconectar Enlace" if es_cortada else "✂️ Bloquear/Cortar Enlace"
+        btn_arista_label = "🔌 Reconectar Enlace" if es_cortada else "✂️ Cortar Enlace"
         
         if st.sidebar.button(btn_arista_label, use_container_width=True):
             if es_cortada:
