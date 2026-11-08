@@ -236,14 +236,14 @@ st.session_state.red.nodes[nodo_sel]['cpu'] = round(nuevo_cpu, 2)
 
 st.sidebar.divider()
 
-st.sidebar.subheader("🔒 Aislamiento & Bloqueo")
+st.sidebar.subheader("🔒 Bloqueo de nodos")
 predicciones = evaluador.predecir_anomalias(st.session_state.red)
 nodos_anomalos_detectados = [n for n, est in predicciones.items() if est == "Anómalo"]
 
-nodo_bloquear_sel = st.sidebar.selectbox("Seleccionar Nodo a Bloquear/Aislar:", list(st.session_state.red.nodes()), key="sel_nodo_block")
+nodo_bloquear_sel = st.sidebar.selectbox("Seleccionar Nodo a Bloquear:", list(st.session_state.red.nodes()), key="sel_nodo_block")
 if nodo_bloquear_sel is not None:
     es_bloqueado_actual = nodo_bloquear_sel in st.session_state.nodos_bloqueados
-    btn_label = "🔓 Desbloquear Nodo" if es_bloqueado_actual else "🔒 Bloquear/Aislar Nodo"
+    btn_label = "🔓 Desbloquear Nodo" if es_bloqueado_actual else "🔒 Bloquear Nodo"
     if st.sidebar.button(btn_label, use_container_width=True):
         if es_bloqueado_actual:
             st.session_state.nodos_bloqueados.remove(nodo_bloquear_sel)
