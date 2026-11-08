@@ -13,21 +13,135 @@ from Logica.GnnInference import EvaluadorRedGNN
 
 st.set_page_config(page_title="NGNet Live Simulator", layout="wide")
 
-# Estilos CSS
+# Estilos CSS: Fondo Claro con Cajas Oscuras de Alto Contraste y Azul Rey Corporativo
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; color: #ffffff; }
-    .stMetric { background-color: #1f2937; padding: 10px; border-radius: 8px; border: 1px solid #374151; }
+    /* 1. Fondo general claro */
+    .main, [data-testid="stAppViewContainer"] { 
+        background-color: #f8fafc !important; 
+        color: #0f172a !important; 
+    }
+
+    /* 2. Textos estándar en el cuerpo principal (excluyendo métricas y botones) */
+    .main p, .main label, [data-testid="stWidgetLabel"] p {
+        color: #0f172a !important;
+        font-weight: 500;
+    }
+
+    /* 3. Encabezados en Azul Rey Corporativo */
+    h1, h2, h3 {
+        color: #1e3a8a !important;
+    }
+
+    /* 4. Barra Lateral (Sidebar): fondo claro con textos oscuros */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        border-right: 1px solid #e2e8f0;
+    }
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        color: #1e293b !important;
+    }
+    section[data-testid="stSidebar"] .stCaption {
+        color: #64748b !important;
+        font-weight: 600;
+    }
+
+    /* 5. Cajas de Métricas Oscuras: Números y Títulos visibles */
+    div[data-testid="stMetric"] { 
+        background-color: #0f172a !important; 
+        padding: 14px 18px !important; 
+        border-radius: 10px !important; 
+        border: 1px solid #334155 !important; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15) !important;
+    }
+    div[data-testid="stMetric"] label,
+    div[data-testid="stMetric"] [data-testid="stMetricLabel"] * {
+        color: #94a3b8 !important;
+        font-weight: 600 !important;
+    }
+    /* Selector estricto para que los números siempre resalten en azul celeste brillante */
+    div[data-testid="stMetric"] [data-testid="stMetricValue"],
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] * {
+        color: #38bdf8 !important;
+        font-size: 2rem !important;
+        font-weight: 800 !important;
+    }
+
+    /* 6. Pestañas (Tabs) con máxima visibilidad y contraste */
+    div[data-testid="stTabs"] button,
+    button[data-baseweb="tab"],
+    [data-testid="stTab"] {
+        color: #1e293b !important;
+    }
+
+    div[data-testid="stTabs"] button *,
+    button[data-baseweb="tab"] *,
+    [data-testid="stTab"] * {
+        color: #1e293b !important; /* Texto de la pestaña inactiva en pizarra oscuro */
+        font-weight: 600 !important;
+        font-size: 15px !important;
+    }
+
+    div[data-testid="stTabs"] button[aria-selected="true"] *,
+    button[data-baseweb="tab"][aria-selected="true"] *,
+    [data-testid="stTab"][aria-selected="true"] * {
+        color: #1d4ed8 !important; /* Pestaña activa en Azul Rey */
+        font-weight: 800 !important;
+    }
+    
+
+    /* 7. Botones oscuros con texto blanco nítido */
+    div.stButton > button {
+        background-color: #0f172a !important;
+        border: 1px solid #334155 !important;
+    }
+    div.stButton > button * {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    div.stButton > button:hover {
+        background-color: #1e293b !important;
+        border-color: #1d4ed8 !important;
+    }
+
+    /* 8. Tablas Markdown estructuradas y con bordes nítidos */
+    div[data-testid="stMarkdownContainer"] table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        background-color: #ffffff !important;
+        border: 1.5px solid #94a3b8 !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+    }
+    div[data-testid="stMarkdownContainer"] table th {
+        background-color: #f1f5f9 !important;
+        color: #1e3a8a !important;
+        font-weight: 700 !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 10px 14px !important;
+        text-align: center !important;
+    }
+    div[data-testid="stMarkdownContainer"] table td {
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 8px 12px !important;
+        text-align: center !important;
+    }
+    div[data-testid="stMarkdownContainer"] table tr:nth-child(even) {
+        background-color: #f8fafc !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-st.title(" NGNet Simulator: Solución técnologica para la empresa SoftCast")
+st.title("🌐 NGNet Simulator: Solución Tecnológica para SoftCast")
 st.caption("Simulador interactivo con detección GNN, tráfico en tiempo real y módulo de validación formal por AFD")
 
 # Estado de Sesión
 if 'red' not in st.session_state:
-    st.session_state.red = generar_red_computadores(num_nodos=12, prob_conexion=0.25)
-    # Asignar nodos bloqueados aleatorios al iniciar
+    st.session_state.red = generar_red_computadores(num_nodos=12, prob_conexion=0.40)
     nodos_init = list(st.session_state.red.nodes())
     st.session_state.nodos_bloqueados = set(random.sample(nodos_init, k=min(2, len(nodos_init))))
 if 'nodos_bloqueados' not in st.session_state:
@@ -50,7 +164,6 @@ def calcular_carga_acumulada_arista(G, u, v):
     traf_v = float(G.nodes[v]['trafico'])
     capacidad = float(G.edges[u, v].get('capacidad', 1000))
     
-    # Mayor sensibilidad en enlaces de menor capacidad
     factor_capacidad = 1.4 if capacidad == 100 else 1.1
     
     vecinos_u = [k for k in G.neighbors(u) if k != v]
@@ -58,7 +171,6 @@ def calcular_carga_acumulada_arista(G, u, v):
     
     traf_agregado = sum(float(G.nodes[k]['trafico']) for k in vecinos_u + vecinos_v)
     
-    # Carga base escalada + aporte de congestión vecina
     carga_base = ((traf_u + traf_v) / 2.0) * factor_capacidad
     carga_total = carga_base + 0.08 * traf_agregado
     
@@ -67,18 +179,17 @@ def calcular_carga_acumulada_arista(G, u, v):
 # --- PANEL LATERAL ---
 st.sidebar.header("🕹️ Controles de Red")
 
-if st.button("🔄 Regenerar Red Aleatoria", use_container_width=True):
-        st.session_state.red = generar_red_computadores()
-        st.session_state.nodos_bloqueados = set(random.sample(list(st.session_state.red.nodes()), 2))
-        st.session_state.conexiones_bloqueadas = set()
-        st.session_state.anim_id += 1
-        
-        # Elimina las claves cacheadas de los sliders para que lean los nuevos valores aleatorios
-        for k in list(st.session_state.keys()):
-            if "trafico" in k or "cpu" in k or "slider" in k:
-                del st.session_state[k]
-                
-        st.rerun()
+if st.sidebar.button("🔄 Regenerar Red Aleatoria", use_container_width=True):
+    st.session_state.red = generar_red_computadores(num_nodos=12, prob_conexion=0.40)
+    st.session_state.nodos_bloqueados = set(random.sample(list(st.session_state.red.nodes()), 2))
+    st.session_state.conexiones_bloqueadas = set()
+    st.session_state.anim_id += 1
+    
+    for k in list(st.session_state.keys()):
+        if "trafico" in k or "cpu" in k or "slider" in k:
+            del st.session_state[k]
+            
+    st.rerun()
 
 st.sidebar.divider()
 
@@ -89,21 +200,17 @@ nodo_sel = st.sidebar.selectbox("Seleccionar Nodo:", nodos_disponibles)
 
 attr_sel = st.session_state.red.nodes[nodo_sel]
 
-# 1. Normalización y protección de rango [0.0, 1.0]
 raw_trafico = float(attr_sel.get('trafico', 0.50))
 raw_cpu = float(attr_sel.get('cpu', 0.50))
 
-if raw_trafico > 1.0:
-    raw_trafico /= 100.0
-if raw_cpu > 1.0:
-    raw_cpu /= 100.0
+if raw_trafico > 1.0: raw_trafico /= 100.0
+if raw_cpu > 1.0: raw_cpu /= 100.0
 
 val_trafico_actual = round(min(1.0, max(0.0, raw_trafico)), 2)
 val_cpu_actual = round(min(1.0, max(0.0, raw_cpu)), 2)
 
-st.sidebar.write(f"**Tipo:** {attr_sel.get('tipo', 'Desconocido')}")
+st.sidebar.write(f"**Tipo:** `{attr_sel.get('tipo', 'Desconocido')}`")
 
-# 2. Clave dinámica vinculada al nodo y al anim_id
 anim_key = st.session_state.get('anim_id', 0)
 
 nuevo_trafico = st.sidebar.slider(
@@ -124,9 +231,9 @@ nuevo_cpu = st.sidebar.slider(
     key=f"slider_cpu_{nodo_sel}_{anim_key}"
 )
 
-# 3. Guardado reactivo en el grafo
 st.session_state.red.nodes[nodo_sel]['trafico'] = round(nuevo_trafico, 2)
 st.session_state.red.nodes[nodo_sel]['cpu'] = round(nuevo_cpu, 2)
+
 st.sidebar.divider()
 
 st.sidebar.subheader("🔒 Aislamiento & Bloqueo")
@@ -137,7 +244,7 @@ nodo_bloquear_sel = st.sidebar.selectbox("Seleccionar Nodo a Bloquear/Aislar:", 
 if nodo_bloquear_sel is not None:
     es_bloqueado_actual = nodo_bloquear_sel in st.session_state.nodos_bloqueados
     btn_label = "🔓 Desbloquear Nodo" if es_bloqueado_actual else "🔒 Bloquear/Aislar Nodo"
-    if st.sidebar.button(btn_label):
+    if st.sidebar.button(btn_label, use_container_width=True):
         if es_bloqueado_actual:
             st.session_state.nodos_bloqueados.remove(nodo_bloquear_sel)
         else:
@@ -163,15 +270,26 @@ st.sidebar.divider()
 
 lista_aristas = [f"{u} <-> {v}" for u, v in st.session_state.red.edges()]
 if lista_aristas:
-    arista_sel = st.sidebar.selectbox("Conexión a Cortar/Saturar:", lista_aristas)
-    if st.sidebar.button("Bloquear/Cortar Enlace"):
+    arista_sel = st.sidebar.selectbox("Conexión a Cortar/Restaurar:", lista_aristas, key="sel_arista_block")
+    if arista_sel:
         u_str, v_str = arista_sel.split(" <-> ")
-        st.session_state.conexiones_bloqueadas.add((int(u_str), int(v_str)))
-        st.session_state.conexiones_bloqueadas.add((int(v_str), int(u_str)))
-        st.session_state.anim_id += 1
-        st.rerun()
+        u_int, v_int = int(u_str), int(v_str)
+        
+        es_cortada = (u_int, v_int) in st.session_state.conexiones_bloqueadas or (v_int, u_int) in st.session_state.conexiones_bloqueadas
+        btn_arista_label = "🔌 Reconectar Enlace" if es_cortada else "✂️ Bloquear/Cortar Enlace"
+        
+        if st.sidebar.button(btn_arista_label, use_container_width=True):
+            if es_cortada:
+                st.session_state.conexiones_bloqueadas.discard((u_int, v_int))
+                st.session_state.conexiones_bloqueadas.discard((v_int, u_int))
+            else:
+                st.session_state.conexiones_bloqueadas.add((u_int, v_int))
+                st.session_state.conexiones_bloqueadas.add((v_int, u_int))
+                
+            st.session_state.anim_id += 1
+            st.rerun()
 
-# --- MÉTRICAS (Lógica de Conjuntos Excluyentes) ---
+# --- MÉTRICAS (Lógica Disjunta) ---
 nodos_bloqueados_set = st.session_state.nodos_bloqueados
 num_bloqueados = len(nodos_bloqueados_set)
 
@@ -192,7 +310,7 @@ col4.metric("Nodos Bloqueados 🔒", num_bloqueados)
 
 st.divider()
 
-# --- SEPARACIÓN POR PESTAÑAS ---
+# --- PESTAÑAS PRINCIPALES ---
 tab_red, tab_automata = st.tabs(["🌐 1. Simulador de Tráfico de Red (Ping / PDU)", "🔤 2. Laboratorio del Autómata (AFD)"])
 
 # ==============================================================================
@@ -209,39 +327,36 @@ with tab_red:
 
     with col_right:
         st.subheader("📡 Inyección y Simulación de Tráfico")
-        st.caption("Prueba el envío de un paquete PDU de datos entre dos nodos evaluando la infraestructura física.")
+        st.caption("Prueba el envío de un paquete PDU evaluando la infraestructura física y QoS.")
         
         col_o, col_d = st.columns(2)
         origen = col_o.selectbox("Origen 📍:", list(st.session_state.red.nodes()), index=0, key="ping_origen")
         destino = col_d.selectbox("Destino 🎯:", list(st.session_state.red.nodes()), index=min(3, len(st.session_state.red)-1), key="ping_destino")
         
-        cadena_predeterminada = "PWSR"
-        automata_net = AutomataComunicacion()
-        
         if st.button("🚀 Transmitir Paquete", use_container_width=True):
             st.session_state.anim_id += 1
             
-            # 1. EVALUAR ESTADO DEL ORIGEN Y DESTINO
             origen_bloqueado = origen in st.session_state.nodos_bloqueados
             origen_anomalo = (predicciones[origen] == "Anómalo")
             destino_bloqueado = destino in st.session_state.nodos_bloqueados
             destino_anomalo = (predicciones[destino] == "Anómalo")
 
-            # 2. CONSTRUIR SUBGRAFO LIMPIO (Umbral estricto < 1.00)
+            G_fisico = st.session_state.red.copy()
+            for u_c, v_c in list(st.session_state.conexiones_bloqueadas):
+                if G_fisico.has_edge(u_c, v_c):
+                    G_fisico.remove_edge(u_c, v_c)
+
             G_limpio = nx.Graph()
-            for u, attr in st.session_state.red.nodes(data=True):
-                es_malo = (predicciones[u] == "Anómalo") or (u in st.session_state.nodos_bloqueados)
-                if not es_malo:
+            for u, attr in G_fisico.nodes(data=True):
+                if predicciones[u] != "Anómalo" and u not in st.session_state.nodos_bloqueados:
                     G_limpio.add_node(u, **attr)
 
-            for u, v, attr in st.session_state.red.edges(data=True):
+            for u, v, attr in G_fisico.edges(data=True):
                 if u in G_limpio and v in G_limpio:
-                    conexion_cortada = (u, v) in st.session_state.conexiones_bloqueadas or (v, u) in st.session_state.conexiones_bloqueadas
                     carga_enlace = calcular_carga_acumulada_arista(st.session_state.red, u, v)
-                    if not conexion_cortada and carga_enlace < 1.00:
+                    if carga_enlace < 1.00:
                         G_limpio.add_edge(u, v, weight=attr['peso'] * (1.0 + carga_enlace))
 
-            # 3. VERIFICAR SI EXISTE CAMINO LIMPIO
             hay_ruta_exitosa = (
                 not origen_bloqueado and not origen_anomalo and
                 not destino_bloqueado and not destino_anomalo and
@@ -255,17 +370,29 @@ with tab_red:
             if hay_ruta_exitosa:
                 ruta_renderizada = nx.shortest_path(G_limpio, origen, destino, weight='weight')
                 exito_transmision = True
-                mensaje_sim = f"✅ Transmisión Exitosa (ACK) vía {' -> '.join(map(str, ruta_renderizada))}"
+                
+                latencia_total = sum(
+                    st.session_state.red[ruta_renderizada[i]][ruta_renderizada[i + 1]]['peso']
+                    for i in range(len(ruta_renderizada) - 1)
+                )
+                mensaje_sim = f"✅ Transmisión Exitosa (ACK) vía {' -> '.join(map(str, ruta_renderizada))} | Latencia Total: {latencia_total:.1f} ms"
             else:
                 exito_transmision = False
 
                 if origen_bloqueado or origen_anomalo:
-                    causa_obstaculo = "Nodo de Origen Bloqueado 🔒" if origen_bloqueado else "Nodo de Origen Anómalo 🔴"
+                    causa = "Nodo de Origen Bloqueado 🔒" if origen_bloqueado else "Nodo de Origen Anómalo 🔴"
                     ruta_renderizada = [origen]
                     obstaculo_tipo = "origen"
-                    mensaje_sim = f"⚠️ Transmisión Abortada: {causa_obstaculo} N{origen}. No puede emitir paquetes."
-                elif nx.has_path(st.session_state.red, origen, destino):
-                    ruta_topologica = nx.shortest_path(st.session_state.red, origen, destino)
+                    mensaje_sim = f"⚠️ Transmisión Abortada: {causa} N{origen}. No puede emitir paquetes."
+                elif not nx.has_path(G_fisico, origen, destino):
+                    ruta_renderizada = [origen]
+                    obstaculo_tipo = "sin_ruta"
+                    if G_fisico.degree(origen) == 0:
+                        mensaje_sim = f"❌ El nodo N{origen} no posee ningún enlace físico disponible para transmitir."
+                    else:
+                        mensaje_sim = f"❌ Sin ruta física conectada entre N{origen} y N{destino} (enlaces cortados)."
+                else:
+                    ruta_topologica = nx.shortest_path(G_fisico, origen, destino)
                     ruta_alcanzada = [origen]
                     causa_obstaculo = "Falla de red"
 
@@ -273,27 +400,18 @@ with tab_red:
                         nodo_prev = ruta_topologica[idx - 1]
                         nodo_act = ruta_topologica[idx]
 
-                        conexion_cortada = (nodo_prev, nodo_act) in st.session_state.conexiones_bloqueadas or (nodo_act, nodo_prev) in st.session_state.conexiones_bloqueadas
                         carga_enlace = calcular_carga_acumulada_arista(st.session_state.red, nodo_prev, nodo_act)
                         es_bloqueado = nodo_act in st.session_state.nodos_bloqueados
                         es_anomalo = (predicciones[nodo_act] == "Anómalo")
 
-                        # PRIORIDAD 1: EL CANAL FÍSICO (El paquete no puede pasar si el enlace falla)
-                        if conexion_cortada:
-                            causa_obstaculo = f"Enlace Cortado ✂️ entre N{nodo_prev} y N{nodo_act}"
-                            obstaculo_tipo = "enlace"
-                            nodo_destino_enlace = nodo_act
-                            break
-                        elif carga_enlace >= 1.00:
+                        if carga_enlace >= 1.00:
                             causa_obstaculo = f"Enlace Saturado ⚠️ ({int(carga_enlace*100)}%) entre N{nodo_prev} y N{nodo_act}"
                             obstaculo_tipo = "enlace"
                             nodo_destino_enlace = nodo_act
                             break
 
-                        # PRIORIDAD 2: SI EL ENLACE ESTÁ SANO, EL PAQUETE ALCANZA EL NODO
                         ruta_alcanzada.append(nodo_act)
 
-                        # PRIORIDAD 3: EVALUAR EL NODO ALCANZADO
                         if es_bloqueado:
                             causa_obstaculo = f"Nodo Bloqueado 🔒 N{nodo_act}"
                             obstaculo_tipo = "nodo"
@@ -305,9 +423,6 @@ with tab_red:
 
                     ruta_renderizada = ruta_alcanzada
                     mensaje_sim = f"⚠️ Paquete Obstruido: {causa_obstaculo}. Rebotando a Origen."
-                else:
-                    ruta_renderizada = [origen]
-                    mensaje_sim = "❌ Sin ruta física conectada entre Origen y Destino."
 
             if exito_transmision:
                 st.success(mensaje_sim)
@@ -326,7 +441,8 @@ with tab_red:
     with col_left:
         st.subheader("🕸️ Topología Interactiva de Red")
         
-        net = Network(height="530px", width="100%", bgcolor="#111827", font_color="white", directed=False)
+        # Canvas PyVis: Fondo oscuro de alto contraste
+        net = Network(height="530px", width="100%", bgcolor="#0F172A", font_color="white", directed=False)
         net.toggle_physics(False)
         net.set_options("""
         {
@@ -344,7 +460,7 @@ with tab_red:
             estado_gnn = predicciones[nodo]
             esta_bloqueado = nodo in st.session_state.nodos_bloqueados
             
-            color = "#6B7280" if esta_bloqueado else ("#EF4444" if estado_gnn == "Anómalo" else "#10B981")
+            color = "#64748b" if esta_bloqueado else ("#ef4444" if estado_gnn == "Anómalo" else "#10b981")
 
             net.add_node(
                 nodo, 
@@ -363,9 +479,8 @@ with tab_red:
                 carga_acumulada = calcular_carga_acumulada_arista(st.session_state.red, source, target)
                 peso_val = attr_e.get('peso', 1.0)
                 capacidad_val = attr_e.get('capacidad', 100)
-                color_edge = "#EF4444" if carga_acumulada >= 1.00 else ("#F59E0B" if carga_acumulada >= 0.75 else "#4B5563")
+                color_edge = "#ef4444" if carga_acumulada >= 1.00 else ("#f59e0b" if carga_acumulada >= 0.75 else "#94a3b8")
 
-                # Texto plano limpio con saltos de línea nativos
                 info_tooltip = (
                     f"Enlace N{source} ⟷ N{target}\n"
                     f"• Capacidad: {capacidad_val} Mbps\n"
@@ -376,16 +491,16 @@ with tab_red:
                 net.add_edge(
                     source, 
                     target, 
-                    # Se elimina 'value=peso_val' para evitar que Vis.js agrande la fuente
                     label=f"{peso_val:.1f}ms", 
                     title=info_tooltip,
                     width=2, 
                     color=color_edge,
                     font={
                         'size': 10, 
-                        'color': '#E5E7EB', 
-                        'background': '#111827', 
-                        'strokeWidth': 0,
+                        'color': '#E2E8F0', 
+                        'background': '#0F172A', 
+                        'strokeWidth': 1,
+                        'strokeColor': '#334155',
                         'align': 'horizontal'
                     }
                 )
@@ -395,13 +510,23 @@ with tab_red:
             with open(tmpfile.name, 'r', encoding='utf-8') as f:
                 html_content = f.read()
 
+        # Tooltip oscuro y animación con retorno elástico asegurado
         js_animacion = f"""
         <!-- ID de Animación Dinámico: {st.session_state.anim_id} -->
         <style>
+            html, body {{
+                background-color: #F8FAFC !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }}
+            #mynetwork {{
+                background-color: #0F172A !important;
+                border: none !important;
+            }}
             div.vis-tooltip {{
                 position: absolute;
-                background-color: #1f2937 !important;
-                color: #f9fafb !important;
+                background-color: #1F2937 !important;
+                color: #F9FAFB !important;
                 font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
                 font-size: 12px !important;
                 line-height: 1.5 !important;
@@ -466,7 +591,9 @@ with tab_red:
                 var obstaculoTipo = {json.dumps(obstaculo_tipo)};
                 var nodoDestinoEnlace = {json.dumps(nodo_destino_enlace)};
 
-                if (!rutaCorta || (rutaCorta.length < 2 && obstaculoTipo !== "enlace")) return;
+                // Blindaje contra enlaces cortados / sin ruta física conectada
+                if (!rutaCorta || obstaculoTipo === "sin_ruta" || obstaculoTipo === "origen") return;
+                if (rutaCorta.length < 2 && obstaculoTipo !== "enlace") return;
 
                 var steps = [];
 
@@ -485,6 +612,7 @@ with tab_red:
                         steps.push({{ from: rutaCorta[i], to: rutaCorta[i-1], startP: 0.0, endP: 1.0, color: '#FF0055' }});
                     }}
                 }} else if (obstaculoTipo === "enlace" && nodoDestinoEnlace !== null) {{
+                    // Solo para enlaces físicos SATURADOS (el cable sí existe en pantalla)
                     var prevNode = rutaCorta[rutaCorta.length - 1];
                     for (var i = 0; i < rutaCorta.length - 1; i++) {{
                         steps.push({{ from: rutaCorta[i], to: rutaCorta[i+1], startP: 0.0, endP: 1.0, color: '#00F0FF' }});
@@ -563,6 +691,7 @@ with tab_red:
             setTimeout(configurarRetornoYAnimacion, 400);
         }})();
         </script>
+        </body>
         """
         
         html_animado = html_content.replace("</body>", js_animacion)
@@ -610,31 +739,38 @@ with tab_automata:
         <html>
         <head>
             <style>
-                body { background-color: #111827; color: #ffffff; font-family: system-ui, sans-serif; margin:0; padding:10px; }
+                html { background-color: #F8FAFC; }
+                body {
+                    background-color: #0F172A; color: #F8FAFC; font-family: system-ui, sans-serif;
+                    margin: 0; padding: 10px; border-radius: 10px; border: 1px solid #334155;
+                    box-sizing: border-box;
+                }
                 .input-box {
                     width: 100%; padding: 12px; font-size: 18px; font-weight: bold;
-                    background: #1F2937; border: 2px solid #3B82F6; border-radius: 8px;
-                    color: #00F0FF; text-align: center; outline: none; box-sizing: border-box;
+                    background: #1E293B; border: 2px solid #1D4ED8; border-radius: 8px;
+                    color: #38BDF8; text-align: center; outline: none; box-sizing: border-box;
                     margin-bottom: 12px; text-transform: uppercase; letter-spacing: 2px;
                 }
+                .input-box::placeholder { color: #64748B; }
                 .status-badge {
                     padding: 10px; border-radius: 6px; font-weight: bold; text-align: center;
-                    font-size: 16px; margin-bottom: 12px; transition: all 0.3s;
+                    font-size: 15px; margin-bottom: 12px; transition: all 0.3s;
                 }
-                .badge-ok { background-color: #065F46; color: #34D399; border: 1px solid #059669; }
-                .badge-fail { background-color: #991B1B; color: #FCA5A5; border: 1px solid #DC2626; }
-                svg { width: 100%; height: 350px; background: #0b0f19; border-radius: 8px; border: 1px solid #374151; }
+                .badge-ok { background-color: rgba(6, 78, 59, 0.65); color: #6EE7B7; border: 1px solid #059669; }
+                .badge-fail { background-color: rgba(127, 29, 29, 0.65); color: #FCA5A5; border: 1px solid #DC2626; }
+                svg { width: 100%; height: 350px; background: #0B0F19; border-radius: 8px; border: 1px solid #334155; box-sizing: border-box; }
                 
-                .node { fill: #1F2937; stroke: #3B82F6; stroke-width: 2px; transition: all 0.3s ease; }
+                .node { fill: #1E293B; stroke: #1D4ED8; stroke-width: 2.5px; transition: all 0.3s ease; }
                 .node-final { stroke: #10B981; stroke-width: 3px; stroke-dasharray: 4 2; }
-                .node.visited { fill: #D97706; stroke: #F59E0B; }
-                .node.active-ok { fill: #10B981; stroke: #34D399; filter: drop-shadow(0 0 8px #34D399); }
-                .node.active-fail { fill: #EF4444; stroke: #FCA5A5; filter: drop-shadow(0 0 8px #EF4444); }
+                .node.visited { fill: #78350F; stroke: #F59E0B; }
+                .node.active-ok { fill: #10B981; stroke: #047857; filter: drop-shadow(0 0 8px rgba(16,185,129,0.6)); }
+                .node.active-fail { fill: #EF4444; stroke: #B91C1C; filter: drop-shadow(0 0 8px rgba(239,68,68,0.6)); }
                 
                 text { fill: #FFFFFF; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none; }
-                .edge { stroke: #4B5563; stroke-width: 2px; transition: stroke 0.3s; }
-                .edge.active { stroke: #00F0FF; stroke-width: 3px; filter: drop-shadow(0 0 5px #00F0FF); }
-                .edge-label { fill: #9CA3AF; font-size: 11px; }
+                .node.active-ok + text, .node.active-fail + text { fill: #FFFFFF; }
+                .edge { stroke: #64748B; stroke-width: 2px; transition: stroke 0.3s; }
+                .edge.active { stroke: #38BDF8; stroke-width: 3.5px; filter: drop-shadow(0 0 6px rgba(56,189,248,0.75)); }
+                .edge-label { fill: #CBD5E1; font-size: 11px; font-weight: bold; }
             </style>
         </head>
         <body>
@@ -644,10 +780,10 @@ with tab_automata:
             <svg viewBox="0 0 600 300">
                 <defs>
                     <marker id="arrow" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#6B7280"/>
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B"/>
                     </marker>
                     <marker id="arrow-active" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#00F0FF"/>
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#38BDF8"/>
                     </marker>
                 </defs>
 
@@ -765,7 +901,5 @@ with tab_automata:
         </body>
         </html>
         """
-
-        components.html(html_automata_reactivo, height=520)
 
         components.html(html_automata_reactivo, height=520)
