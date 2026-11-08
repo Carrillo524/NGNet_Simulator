@@ -327,7 +327,7 @@ with tab_red:
 
     with col_right:
         st.subheader("📡 Inyección y Simulación de Tráfico")
-        st.caption("Prueba el envío de un paquete PDU evaluando la infraestructura física y QoS.")
+        st.caption("Prueba el envío de un paquete PDU.")
         
         col_o, col_d = st.columns(2)
         origen = col_o.selectbox("Origen 📍:", list(st.session_state.red.nodes()), index=0, key="ping_origen")
